@@ -25,21 +25,21 @@ header{background:linear-gradient(135deg,#a29bfe,#6c5ce7);color:#fff;padding:16p
 .mask.show{display:block;}
 .para-item{border:1px solid #eee;border-radius:12px;padding:12px;margin-bottom:10px;transition:background .15s;}
 .para-item.selected{background:#f0edff;border-color:#a29bfe;}
-.para-src{font-size:15px;font-weight:500;line-height:1.5;}
-.para-tr{font-size:14px;color:#636e72;margin-top:6px;border-left:3px solid #a29bfe;padding-left:8px;line-height:1.5;}
+.para-src{font-size:15px;font-weight:500;line-height:1.6;}
+.para-tr{font-size:14px;color:#636e72;margin-top:6px;border-left:3px solid #a29bfe;padding-left:8px;line-height:1.6;}
 .prof-circle{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;border:2px solid;}
 .p-red{color:#e74c3c;border-color:#e74c3c;}
 .p-yellow{color:#d4a017;border-color:#f1c40f;}
 .p-green{color:#27ae60;border-color:#2ecc71;}
 .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
-input[type=text],textarea{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid #ddd;font-size:14px;margin-bottom:10px;font-family:inherit;resize:vertical;}
+input[type=text],textarea{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid #ddd;font-size:14px;margin-bottom:10px;font-family:inherit;resize:vertical;line-height:1.6;}
 .tag-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;}
 select{padding:8px;border-radius:10px;border:1px solid #ddd;font-size:13px;background:#fff;}
 .practice-overlay{position:fixed;inset:0;background:#f5f6fa;z-index:200;display:none;flex-direction:column;}
 .practice-overlay.active{display:flex;}
 .prac-head{padding:14px 18px;display:flex;justify-content:space-between;align-items:center;background:#fff;}
 .prac-body{flex:1;padding:28px 20px;overflow-y:auto;}
-.prac-text{font-size:22px;line-height:1.7;margin-bottom:24px;white-space:pre-wrap;}
+.prac-text{font-size:22px;line-height:1.75;margin-bottom:24px;white-space:pre-wrap;}
 .prac-hidden{background:#e8e9ed;border-radius:12px;padding:18px;color:transparent;cursor:pointer;user-select:none;margin-top:8px;position:relative;line-height:1.7;min-height:60px;}
 .prac-hidden.revealed{color:#444;background:#e8f7f0;}
 .prac-hidden::after{content:"点击揭晓";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:13px;color:#b2bec3;}
@@ -53,6 +53,7 @@ select{padding:8px;border-radius:10px;border:1px solid #ddd;font-size:13px;backg
 .fab-group{position:absolute;top:6px;right:6px;display:flex;gap:6px;}
 .fab-btn{font-size:13px;cursor:pointer;background:rgba(255,255,255,.85);border-radius:50%;width:24px;height:24px;line-height:24px;text-align:center;}
 .note-flag{font-size:10px;color:#a29bfe;margin-top:6px;}
+#pracNoteBar{white-space:normal;line-height:1.7;}
 </style>
 </head>
 <body>
@@ -63,7 +64,7 @@ select{padding:8px;border-radius:10px;border:1px solid #ddd;font-size:13px;backg
 
 <div class="practice-overlay" id="pracOverlay">
   <div class="prac-head"><span id="pracTitle">练习中</span><button class="btn ghost" onclick="togglePracNote()">📝 备注</button></div>
-  <div id="pracNoteBar" style="display:none;background:#fffbe6;padding:10px 18px;font-size:13px;color:#7a6a00;line-height:1.5;border-bottom:1px solid #f1e5b8;"></div>
+  <div id="pracNoteBar" style="display:none;background:#fffbe6;padding:12px 18px;font-size:13px;color:#7a6a00;line-height:1.75;border-bottom:1px solid #f1e5b8;"></div>
   <div class="prac-body"><div id="pracSource" class="prac-text"></div><div id="pracTarget" class="prac-hidden" onclick="this.classList.toggle('revealed')"></div></div>
   <div class="prac-foot"><button class="btn ghost" onclick="exitPractice()">返回</button><button class="btn" onclick="nextPractice()">练习完成</button></div>
 </div>
@@ -77,6 +78,8 @@ function save(){try{localStorage.setItem(STORE,JSON.stringify(DB));}catch(e){}}
 function uid(){return Math.random().toString(36).slice(2,10);}
 function todayStr(){var d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+/* 安全渲染带换行的备注文本 */
+function renderNoteText(s){if(!s||!String(s).trim())return '（本段暂无备注）';return esc(s).replace(/\n/g,'<br>');}
 
 var app=document.getElementById('app'),sheet=document.getElementById('sheet'),mask=document.getElementById('mask');
 var state={view:'home',folderId:null,articleId:null,multi:false,sel:[]};
@@ -157,8 +160,7 @@ function cancelMulti(){state.multi=false;state.sel=[];renderArticle();}
 
 function renderArticle(){
   var a=getArticle(state.articleId);if(!a){renderFolder();return;}
-  var btnLabel=state.multi?'✕ 取消':'多选';
-  var btnAction=state.multi?'cancelMulti()':'enterMulti()';
+  var btnLabel=state.multi?'✕ 取消':'多选',btnAction=state.multi?'cancelMulti()':'enterMulti()';
   var html='<div class="topbar"><button class="btn ghost" onclick="renderFolder()">← 返回</button><strong>'+esc(a.name)+'</strong><button class="btn ghost" onclick="'+btnAction+'">'+btnLabel+'</button></div>'+
     '<div class="art-actions"><button class="btn" onclick="startPractice(\'toZh\')">📖 外译汉</button><button class="btn" onclick="startPractice(\'toSrc\')">✍️ 汉译外</button><button class="btn ghost" onclick="addParagraph()">＋ 添加段落</button><button class="btn ghost" onclick="renameArticle(\''+a.id+'\')">重命名</button></div>';
   if(state.multi){
@@ -185,16 +187,14 @@ function toggleSel(id){var i=state.sel.indexOf(id);if(i>=0)state.sel.splice(i,1)
 function enterSel(id){state.multi=true;if(state.sel.indexOf(id)<0)state.sel.push(id);renderArticle();}
 function addParagraph(){editParagraph(null);}
 
-/* ===== 修复点在这里 ===== */
 function editParagraph(pid){
   var a=getArticle(state.articleId), p=pid?getPara(a,pid):null;
   if(pid && paraDraft.pid === pid){
-    // 草稿归属命中（刚从备注页回来）：保留用户敲到一半的内容，不覆盖
+    // 刚从备注页回来，保留用户敲到一半的原文/译文
   } else {
-    // 正常进入编辑：从段落本体读取真实数据
-    paraDraft.pid = pid;
-    paraDraft.source = p ? p.source : '';
-    paraDraft.target = p ? p.target : '';
+    paraDraft.pid=pid;
+    paraDraft.source=p?p.source:'';
+    paraDraft.target=p?p.target:'';
   }
   var header=p?'编辑段落':'新增段落';
   var delBtn=p?'<button class="btn danger" onclick="deletePara(\''+pid+'\')">删除本段</button>':'';
@@ -225,7 +225,7 @@ function openNoteSheet(pid){
   sheet.classList.add('open');mask.classList.add('show');
   document.getElementById('sheetBody').innerHTML=
     '<h3 style="margin-top:0;">段落备注</h3>'+
-    '<textarea id="noteTa" rows="6" placeholder="记录语法点、生词、文化背景等...">'+esc(p.note||'')+'</textarea>'+
+    '<textarea id="noteTa" rows="7" placeholder="记录语法点、生词、文化背景等...">'+esc(p.note||'')+'</textarea>'+
     '<div style="display:flex;gap:8px;margin-top:6px;">'+
     '<button class="btn" onclick="saveNote(\''+pid+'\')">保存备注</button>'+
     '<button class="btn ghost" onclick="closeSheet();setTimeout(function(){editParagraph(\''+pid+'\');},100)">返回编辑</button>'+
@@ -234,8 +234,9 @@ function openNoteSheet(pid){
 function saveNote(pid){
   var v=document.getElementById('noteTa').value;
   var a=getArticle(state.articleId),p=getPara(a,pid);
-  if(p){p.note=v;save();}
-  closeSheet();setTimeout(function(){editParagraph(pid);},100);
+  if(p){p.note=v;save();}   /* 直接写回段落对象并落库，点完这里就已经存好了 */
+  closeSheet();
+  setTimeout(function(){editParagraph(pid);},100);
 }
 function openSheet(html,showMask){document.getElementById('sheetBody').innerHTML=html;sheet.classList.add('open');if(showMask)mask.classList.add('show');}
 function closeSheet(){sheet.classList.remove('open');mask.classList.remove('show');}
@@ -248,7 +249,11 @@ mask.onclick=function(){
 var prac={mode:'',idx:0,order:[]};
 function startPractice(mode){var a=getArticle(state.articleId);if(!a.paragraphs.length){alert('还没有段落，先添加一些吧。');return;}prac={mode:mode,idx:0,order:[]};for(var i=0;i<a.paragraphs.length;i++)prac.order.push(a.paragraphs[i].id);document.getElementById('pracOverlay').classList.add('active');renderPrac();}
 function renderPrac(){var p=getPara(getArticle(state.articleId),prac.order[prac.idx]);document.getElementById('pracTitle').textContent='练习 '+(prac.idx+1)+' / '+prac.order.length;document.getElementById('pracNoteBar').style.display='none';var top=prac.mode==='toZh'?p.source:p.target,bot=prac.mode==='toZh'?p.target:p.source;document.getElementById('pracSource').textContent=top;var tg=document.getElementById('pracTarget');tg.textContent=bot;tg.classList.remove('revealed');window.__curNote=p?p.note||'':'';}
-function togglePracNote(){var bar=document.getElementById('pracNoteBar');bar.style.display=bar.style.display==='none'?'block':'none';if(bar.style.display==='block')bar.textContent=window.__curNote||'（本段暂无备注）';}
+function togglePracNote(){
+  var bar=document.getElementById('pracNoteBar');
+  bar.style.display=bar.style.display==='none'?'block':'none';
+  if(bar.style.display==='block'){bar.innerHTML=renderNoteText(window.__curNote);}
+}
 function nextPractice(){if(prac.idx<prac.order.length-1){prac.idx++;renderPrac();}else{finishPractice();}}
 function exitPractice(){document.getElementById('pracOverlay').classList.remove('active');}
 function finishPractice(){var a=getArticle(state.articleId),td=todayStr();if(a.lastPracticeDate!==td){a.proficiency=(a.proficiency||0)+1;a.lastPracticeDate=td;}a.lastPracticed=Date.now();save();document.getElementById('pracOverlay').classList.remove('active');alert('🎉 全部段落练习完成！熟练度 +1');renderFolder();}
