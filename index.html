@@ -52,6 +52,7 @@ select{padding:8px;border-radius:10px;border:1px solid #ddd;font-size:13px;backg
 .full-btn{width:100%;margin-top:16px;}
 .fab-group{position:absolute;top:6px;right:6px;display:flex;gap:6px;}
 .fab-btn{font-size:13px;cursor:pointer;background:rgba(255,255,255,.85);border-radius:50%;width:24px;height:24px;line-height:24px;text-align:center;}
+.note-flag{font-size:10px;color:#a29bfe;margin-top:6px;}
 </style>
 </head>
 <body>
@@ -69,7 +70,7 @@ select{padding:8px;border-radius:10px;border:1px solid #ddd;font-size:13px;backg
 
 <script>
 "use strict";
-var STORE='yixiben_data_v2';
+var STORE='yixiben_data_v3';
 var DB=load();
 function load(){try{return JSON.parse(localStorage.getItem(STORE))||{folders:[]};}catch(e){return{folders:[]};}}
 function save(){try{localStorage.setItem(STORE,JSON.stringify(DB));}catch(e){}}
@@ -79,11 +80,23 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){retur
 
 var app=document.getElementById('app'),sheet=document.getElementById('sheet'),mask=document.getElementById('mask');
 var state={view:'home',folderId:null,articleId:null,multi:false,sel:[]};
-var paraDraft={pid:null,source:'',target:'',note:''};
+var paraDraft={pid:null,source:'',target:''};
 
 function ready(fn){if(document.readyState!=='loading')fn();else document.addEventListener('DOMContentLoaded',fn);}
-ready(function(){renderHome();});
+ready(function(){migrateNotes();renderHome();});
 function goHome(){state.view='home';state.folderId=null;state.articleId=null;renderHome();}
+
+function migrateNotes(){
+  var dirty=false;
+  for(var i=0;i<DB.folders.length;i++){
+    var arts=DB.folders[i].articles;
+    for(var j=0;j<arts.length;j++){
+      var ps=arts[j].paragraphs;
+      for(var k=0;k<ps.length;k++){if(!('note' in ps[k])){ps[k].note='';dirty=true;}}
+    }
+  }
+  if(dirty)save();
+}
 
 function renderHome(){
   var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">'+
@@ -125,14 +138,11 @@ function renderArticleList(){
   for(var j=0;j<arr.length;j++){
     var a=arr[j],p=a.proficiency||0,cls=p<=2?'p-red':p<=5?'p-yellow':'p-green',t=a.lastPracticed?new Date(a.lastPracticed).toLocaleString('zh-CN'):'尚未练习';
     html+='<div class="card" onclick="openArticle(\''+a.id+'\')">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;">'+
-      '<strong style="flex:1;">'+esc(a.name)+'</strong>'+
-      '<span class="prof-circle '+cls+'">'+p+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;"><strong style="flex:1;">'+esc(a.name)+'</strong><span class="prof-circle '+cls+'">'+p+'</span></div>'+
       '<div style="font-size:12px;color:#999;margin-top:6px;">'+a.paragraphs.length+' 段 · 上次复习：'+t+'</div>'+
       '<div style="display:flex;justify-content:flex-end;gap:14px;margin-top:8px;">'+
       '<span onclick="event.stopPropagation();renameArticle(\''+a.id+'\')" style="font-size:12px;color:#6c5ce7;cursor:pointer;">重命名</span>'+
-      '<span onclick="event.stopPropagation();delArticle(\''+a.id+'\')" style="font-size:12px;color:#d63031;cursor:pointer;">删除</span>'+
-      '</div></div>';
+      '<span onclick="event.stopPropagation();delArticle(\''+a.id+'\')" style="font-size:12px;color:#d63031;cursor:pointer;">删除</span></div></div>';
   }
   if(!arr.length)html='<div style="text-align:center;color:#aaa;padding:30px 0;">暂无文章，点下方按钮新建</div>';
   document.getElementById('artList').innerHTML=html;
@@ -165,7 +175,7 @@ function renderParaList(){
     html+='<div class="para-item '+ck+'" oncontextmenu="event.preventDefault();enterSel(\''+p.id+'\');return false;" onclick="'+(state.multi?'toggleSel(\''+p.id+'\')':'')+'">';
     if(state.multi) html+='<input type="checkbox" '+(ck?'checked':'')+' style="margin-right:8px;vertical-align:middle;" onclick="event.stopPropagation();toggleSel(\''+p.id+'\')">';
     html+='<div class="para-src">'+esc(p.source)+'</div><div class="para-tr">'+esc(p.target)+'</div>';
-    if(!state.multi) html+='<div style="font-size:11px;color:#bbb;text-align:right;margin-top:4px;cursor:pointer;" onclick="event.stopPropagation();editParagraph(\''+p.id+'\')">编辑</div>';
+    if(!state.multi){html+='<div class="note-flag">'+(p.note?'有备注':'')+'</div><div style="font-size:11px;color:#bbb;text-align:right;margin-top:2px;cursor:pointer;" onclick="event.stopPropagation();editParagraph(\''+p.id+'\')">编辑</div>';}
     html+='</div>';
   }
   if(!a.paragraphs.length)html='<div style="text-align:center;color:#aaa;padding:20px 0;">还没有段落，点上方「＋ 添加段落」开始</div>';
@@ -175,45 +185,69 @@ function toggleSel(id){var i=state.sel.indexOf(id);if(i>=0)state.sel.splice(i,1)
 function enterSel(id){state.multi=true;if(state.sel.indexOf(id)<0)state.sel.push(id);renderArticle();}
 function addParagraph(){editParagraph(null);}
 
+/* ===== 修复点在这里 ===== */
 function editParagraph(pid){
-  var a=getArticle(state.articleId),p=pid?getPara(a,pid):null;
-  var src=paraDraft.pid===pid?paraDraft.source:(p?p.source:'');
-  var trg=paraDraft.pid===pid?paraDraft.target:(p?p.target:'');
-  openSheet('<h3 style="margin-top:0;">'+(p?'编辑段落':'新增段落')+'</h3><textarea id="edSrc" rows="4" placeholder="外文原文">'+esc(src)+'</textarea><textarea id="edTr" rows="4" placeholder="中文译文">'+esc(trg)+'</textarea><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;"><button class="btn ghost" onclick="openNoteSheet(\''+(pid||'')+'\')">📝 备注</button><button class="btn" onclick="savePara(\''+(pid||'')+'\')">保存</button>'+(p?'<button class="btn danger" onclick="deletePara(\''+pid+'\')">删除本段</button>':'')+'<button class="btn ghost" onclick="closeSheet()">取消</button></div>',true);
+  var a=getArticle(state.articleId), p=pid?getPara(a,pid):null;
+  if(pid && paraDraft.pid === pid){
+    // 草稿归属命中（刚从备注页回来）：保留用户敲到一半的内容，不覆盖
+  } else {
+    // 正常进入编辑：从段落本体读取真实数据
+    paraDraft.pid = pid;
+    paraDraft.source = p ? p.source : '';
+    paraDraft.target = p ? p.target : '';
+  }
+  var header=p?'编辑段落':'新增段落';
+  var delBtn=p?'<button class="btn danger" onclick="deletePara(\''+pid+'\')">删除本段</button>':'';
+  openSheet('<h3 style="margin-top:0;">'+header+'</h3>'+
+    '<textarea id="edSrc" rows="4" placeholder="外文原文">'+esc(paraDraft.source)+'</textarea>'+
+    '<textarea id="edTr" rows="4" placeholder="中文译文">'+esc(paraDraft.target)+'</textarea>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">'+
+    '<button class="btn ghost" onclick="openNoteSheet(\''+(pid||'')+'\')">📝 备注</button>'+
+    '<button class="btn" onclick="savePara(\''+(pid||'')+'\')">保存</button>'+
+    delBtn+
+    '<button class="btn ghost" onclick="closeSheet()">取消</button></div>',true);
 }
+
 function savePara(pid){
   var s=document.getElementById('edSrc').value;if(s)s=s.trim();var t=document.getElementById('edTr').value;if(t)t=t.trim();if(!s&&!t){closeSheet();return;}
   var a=getArticle(state.articleId);
-  if(pid){var p=getPara(a,pid);p.source=s;p.target=t;if(paraDraft.pid===pid)p.note=paraDraft.note;}
-  else a.paragraphs.push({id:uid(),source:s,target:t,note:paraDraft.note||''});
-  paraDraft={pid:null,source:'',target:'',note:''};save();closeSheet();renderArticle();
+  if(pid){var p=getPara(a,pid);p.source=s;p.target=t;}
+  else{a.paragraphs.push({id:uid(),source:s,target:t,note:''});}
+  paraDraft={pid:null,source:'',target:''};save();closeSheet();renderArticle();
 }
-function deletePara(pid){if(confirm('确定删除该段落？')){var a=getArticle(state.articleId);a.paragraphs=a.paragraphs.filter(function(x){return x.id!==pid;});paraDraft={pid:null,source:'',target:'',note:''};save();closeSheet();renderArticle();}}
+function deletePara(pid){if(confirm('确定删除该段落？')){var a=getArticle(state.articleId);a.paragraphs=a.paragraphs.filter(function(x){return x.id!==pid;});paraDraft={pid:null,source:'',target:''};save();closeSheet();renderArticle();}}
+
 function openNoteSheet(pid){
   var a=getArticle(state.articleId),p=pid?getPara(a,pid):null;
+  if(!p){alert('请先保存该段落，再添加备注');return;}
   var cs=document.getElementById('edSrc'),ct=document.getElementById('edTr');
   paraDraft.pid=pid;paraDraft.source=cs?cs.value:'';paraDraft.target=ct?ct.value:'';
-  if(!paraDraft.note && p) paraDraft.note=p.note||'';
   sheet.classList.add('open');mask.classList.add('show');
-  document.getElementById('sheetBody').innerHTML='<h3 style="margin-top:0;">段落备注</h3><textarea id="noteTa" rows="6" placeholder="记录语法点、生词等...">'+esc(paraDraft.note||'')+'</textarea><div style="display:flex;gap:8px;margin-top:6px;"><button class="btn" onclick="saveNote(\''+pid+'\')">保存备注</button><button class="btn ghost" onclick="closeSheet();setTimeout(function(){editParagraph(\''+pid+'\');},100)">返回编辑</button></div>';
+  document.getElementById('sheetBody').innerHTML=
+    '<h3 style="margin-top:0;">段落备注</h3>'+
+    '<textarea id="noteTa" rows="6" placeholder="记录语法点、生词、文化背景等...">'+esc(p.note||'')+'</textarea>'+
+    '<div style="display:flex;gap:8px;margin-top:6px;">'+
+    '<button class="btn" onclick="saveNote(\''+pid+'\')">保存备注</button>'+
+    '<button class="btn ghost" onclick="closeSheet();setTimeout(function(){editParagraph(\''+pid+'\');},100)">返回编辑</button>'+
+    '</div>';
 }
-function saveNote(pid){paraDraft.note=document.getElementById('noteTa').value;var p=getPara(getArticle(state.articleId),pid);if(p)p.note=paraDraft.note;closeSheet();setTimeout(function(){editParagraph(pid);},100);}
+function saveNote(pid){
+  var v=document.getElementById('noteTa').value;
+  var a=getArticle(state.articleId),p=getPara(a,pid);
+  if(p){p.note=v;save();}
+  closeSheet();setTimeout(function(){editParagraph(pid);},100);
+}
 function openSheet(html,showMask){document.getElementById('sheetBody').innerHTML=html;sheet.classList.add('open');if(showMask)mask.classList.add('show');}
 function closeSheet(){sheet.classList.remove('open');mask.classList.remove('show');}
-
-/* 关键改动：备注编辑器可见时，点遮罩不关闭 */
-mask.onclick = function(){
-  var nt = document.getElementById('noteTa');
-  if(nt && nt.offsetParent !== null){ /* 备注框正在展示，吞掉点击，顺手收键盘 */
-    if(document.activeElement && typeof document.activeElement.blur === 'function') document.activeElement.blur();
-    return;
-  }
+mask.onclick=function(){
+  var nt=document.getElementById('noteTa');
+  if(nt&&nt.offsetParent!==null){if(document.activeElement&&typeof document.activeElement.blur==='function')document.activeElement.blur();return;}
   closeSheet();
 };
 
 var prac={mode:'',idx:0,order:[]};
 function startPractice(mode){var a=getArticle(state.articleId);if(!a.paragraphs.length){alert('还没有段落，先添加一些吧。');return;}prac={mode:mode,idx:0,order:[]};for(var i=0;i<a.paragraphs.length;i++)prac.order.push(a.paragraphs[i].id);document.getElementById('pracOverlay').classList.add('active');renderPrac();}
-function renderPrac(){var p=getPara(getArticle(state.articleId),prac.order[prac.idx]);document.getElementById('pracTitle').textContent='练习 '+(prac.idx+1)+' / '+prac.order.length;document.getElementById('pracNoteBar').style.display='none';var top=prac.mode==='toZh'?p.source:p.target,bot=prac.mode==='toZh'?p.target:p.source;document.getElementById('pracSource').textContent=top;var tg=document.getElementById('pracTarget');tg.textContent=bot;tg.classList.remove('revealed');window.__curNote=p?p.note:'';}
+function renderPrac(){var p=getPara(getArticle(state.articleId),prac.order[prac.idx]);document.getElementById('pracTitle').textContent='练习 '+(prac.idx+1)+' / '+prac.order.length;document.getElementById('pracNoteBar').style.display='none';var top=prac.mode==='toZh'?p.source:p.target,bot=prac.mode==='toZh'?p.target:p.source;document.getElementById('pracSource').textContent=top;var tg=document.getElementById('pracTarget');tg.textContent=bot;tg.classList.remove('revealed');window.__curNote=p?p.note||'':'';}
 function togglePracNote(){var bar=document.getElementById('pracNoteBar');bar.style.display=bar.style.display==='none'?'block':'none';if(bar.style.display==='block')bar.textContent=window.__curNote||'（本段暂无备注）';}
 function nextPractice(){if(prac.idx<prac.order.length-1){prac.idx++;renderPrac();}else{finishPractice();}}
 function exitPractice(){document.getElementById('pracOverlay').classList.remove('active');}
@@ -222,7 +256,7 @@ function moveSel(dir){var arr=getArticle(state.articleId).paragraphs,idxs=[];for
 function delSel(){if(!state.sel.length)return;if(!confirm('确定删除选中的段落吗？'))return;var a=getArticle(state.articleId);a.paragraphs=a.paragraphs.filter(function(p){return state.sel.indexOf(p.id)<0;});save();cancelMulti();}
 
 function exportData(){var b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}),u=URL.createObjectURL(b),el=document.createElement('a');el.href=u;el.download='译习本数据.json';document.body.appendChild(el);el.click();document.body.removeChild(el);URL.revokeObjectURL(u);}
-function importData(){var inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=function(e){var fr=new FileReader();fr.onload=function(){try{var o=JSON.parse(fr.result);if(confirm('导入将覆盖当前数据，确认？')){DB=o;save();renderHome();}}catch(err){alert('文件格式错误');}};fr.readAsText(e.target.files[0]);};inp.click();}
+function importData(){var inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=function(e){var fr=new FileReader();fr.onload=function(){try{var o=JSON.parse(fr.result);if(!o||!Array.isArray(o.folders)){alert('文件格式不正确');return;}if(confirm('导入将覆盖当前数据，确认？')){DB=o;migrateNotes();save();renderHome();}}catch(err){alert('文件格式错误');}};fr.readAsText(e.target.files[0]);};inp.click();}
 
 function getFolder(id){for(var i=0;i<DB.folders.length;i++)if(DB.folders[i].id===id)return DB.folders[i];return null;}
 function getArticle(id){var f=getFolder(state.folderId);if(!f)return null;for(var i=0;i<f.articles.length;i++)if(f.articles[i].id===id)return f.articles[i];return null;}
