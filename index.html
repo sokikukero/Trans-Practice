@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>译习本</title>
+<style>
+*{box-sizing:border-box;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;background:#f5f6fa;color:#2d3436;}
+header{background:linear-gradient(135deg,#a29bfe,#6c5ce7);color:#fff;padding:16px;text-align:center;font-size:20px;font-weight:700;letter-spacing:1px;position:sticky;top:0;z-index:50;}
+.container{padding:16px;max-width:720px;margin:0 auto;}
+.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 3px 10px rgba(0,0,0,.05);}
+.folder-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+.folder-card{background:#fff;border-radius:16px;padding:22px 8px 14px;text-align:center;box-shadow:0 3px 10px rgba(0,0,0,.05);position:relative;cursor:pointer;border:1px solid #f0f0f0;}
+.folder-emoji{font-size:38px;line-height:1;}
+.folder-name{font-size:14px;margin-top:8px;word-break:break-all;}
+.folder-count{font-size:12px;color:#aaa;margin-top:4px;}
+.btn{display:inline-block;padding:10px 18px;border:none;border-radius:22px;background:#6c5ce7;color:#fff;font-size:14px;cursor:pointer;font-family:inherit;text-align:center;}
+.btn.ghost{background:transparent;color:#6c5ce7;border:1px solid #6c5ce7;}
+.btn.danger{background:#ffeaa7;color:#d63031;}
+.sheet{position:fixed;left:0;right:0;bottom:-120%;background:#fff;border-radius:20px 20px 0 0;padding:22px 18px 30px;box-shadow:0 -6px 30px rgba(0,0,0,.12);transition:bottom .32s ease;z-index:100;max-height:80vh;overflow-y:auto;}
+.sheet.open{bottom:0;}
+.mask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:90;}
+.mask.show{display:block;}
+.para-item{border:1px solid #eee;border-radius:12px;padding:12px;margin-bottom:10px;transition:background .15s;}
+.para-item.selected{background:#f0edff;border-color:#a29bfe;}
+.para-src{font-size:15px;font-weight:500;line-height:1.5;}
+.para-tr{font-size:14px;color:#636e72;margin-top:6px;border-left:3px solid #a29bfe;padding-left:8px;line-height:1.5;}
+.prof-circle{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;border:2px solid;}
+.p-red{color:#e74c3c;border-color:#e74c3c;}
+.p-yellow{color:#d4a017;border-color:#f1c40f;}
+.p-green{color:#27ae60;border-color:#2ecc71;}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+input[type=text],textarea{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid #ddd;font-size:14px;margin-bottom:10px;font-family:inherit;resize:vertical;}
+.tag-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;}
+select{padding:8px;border-radius:10px;border:1px solid #ddd;font-size:13px;background:#fff;}
+.practice-overlay{position:fixed;inset:0;background:#f5f6fa;z-index:200;display:none;flex-direction:column;}
+.practice-overlay.active{display:flex;}
+.prac-head{padding:14px 18px;display:flex;justify-content:space-between;align-items:center;background:#fff;}
+.prac-body{flex:1;padding:28px 20px;overflow-y:auto;}
+.prac-text{font-size:22px;line-height:1.7;margin-bottom:24px;white-space:pre-wrap;}
+.prac-hidden{background:#e8e9ed;border-radius:12px;padding:18px;color:transparent;cursor:pointer;user-select:none;margin-top:8px;position:relative;line-height:1.7;min-height:60px;}
+.prac-hidden.revealed{color:#444;background:#e8f7f0;}
+.prac-hidden::after{content:"点击揭晓";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:13px;color:#b2bec3;}
+.prac-hidden.revealed::after{display:none;}
+.prac-foot{padding:14px;display:flex;gap:12px;background:#fff;border-top:1px solid #eee;}
+.prac-foot button{flex:1;}
+.long-hint{font-size:11px;color:#bbb;text-align:center;margin-bottom:4px;}
+.art-actions{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.art-actions .btn{flex:1;min-width:110px;}
+.full-btn{width:100%;margin-top:16px;}
+.fab-group{position:absolute;top:6px;right:6px;display:flex;gap:6px;}
+.fab-btn{font-size:13px;cursor:pointer;background:rgba(255,255,255,.85);border-radius:50%;width:24px;height:24px;line-height:24px;text-align:center;}
+</style>
+</head>
+<body>
+<header>📒 译习本</header>
+<div class="container" id="app"></div>
+<div class="mask" id="mask"></div>
+<div class="sheet" id="sheet"><div id="sheetBody"></div></div>
+
+<div class="practice-overlay" id="pracOverlay">
+  <div class="prac-head"><span id="pracTitle">练习中</span><button class="btn ghost" onclick="togglePracNote()">📝 备注</button></div>
+  <div id="pracNoteBar" style="display:none;background:#fffbe6;padding:10px 18px;font-size:13px;color:#7a6a00;line-height:1.5;border-bottom:1px solid #f1e5b8;"></div>
+  <div class="prac-body"><div id="pracSource" class="prac-text"></div><div id="pracTarget" class="prac-hidden" onclick="this.classList.toggle('revealed')"></div></div>
+  <div class="prac-foot"><button class="btn ghost" onclick="exitPractice()">返回</button><button class="btn" onclick="nextPractice()">练习完成</button></div>
+</div>
+
+<script>
+"use strict";
+var STORE='yixiben_data_v2';
+var DB=load();
+function load(){try{return JSON.parse(localStorage.getItem(STORE))||{folders:[]};}catch(e){return{folders:[]};}}
+function save(){try{localStorage.setItem(STORE,JSON.stringify(DB));}catch(e){}}
+function uid(){return Math.random().toString(36).slice(2,10);}
+function todayStr(){var d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+
+var app=document.getElementById('app'),sheet=document.getElementById('sheet'),mask=document.getElementById('mask');
+var state={view:'home',folderId:null,articleId:null,multi:false,sel:[]};
+var paraDraft={pid:null,source:'',target:'',note:''};
+
+function ready(fn){if(document.readyState!=='loading')fn();else document.addEventListener('DOMContentLoaded',fn);}
+ready(function(){renderHome();});
+function goHome(){state.view='home';state.folderId=null;state.articleId=null;renderHome();}
+
+function renderHome(){
+  var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">'+
+    '<span style="font-weight:700;font-size:16px;">我的语种</span>'+
+    '<span style="display:flex;gap:8px;"><button class="btn ghost" onclick="exportData()">导出</button><button class="btn ghost" onclick="importData()">导入</button></span></div>'+
+    '<div class="folder-grid">';
+  for(var i=0;i<DB.folders.length;i++){
+    var f=DB.folders[i];
+    html+='<div class="folder-card" onclick="openFolder(\''+f.id+'\')">'+
+      '<div class="fab-group"><span class="fab-btn" title="编辑" onclick="event.stopPropagation();editFolder(\''+f.id+'\')">✏️</span>'+
+      '<span class="fab-btn" title="删除" onclick="event.stopPropagation();delFolder(\''+f.id+'\')">🗑️</span></div>'+
+      '<div class="folder-emoji">'+(f.emoji||'📁')+'</div><div class="folder-name">'+esc(f.name)+'</div>'+
+      '<div class="folder-count">'+f.articles.length+' 篇文章</div></div>';
+  }
+  html+='</div><button class="btn full-btn" onclick="showNewFolder()">＋ 新建语种文件夹</button>';
+  app.innerHTML=html;
+}
+function showNewFolder(){openSheet('<h3 style="margin-top:0;">新建语种文件夹</h3><input id="fnName" type="text" placeholder="文件夹名称，如：English"><input id="fnEmoji" type="text" placeholder="Emoji 图标，如：🇬🇧" maxlength="2"><div style="display:flex;gap:8px;margin-top:6px;"><button class="btn" onclick="commitFolder()">保存</button><button class="btn ghost" onclick="closeSheet()">取消</button></div>',true);}
+function commitFolder(){var n=document.getElementById('fnName').value;if(n)n=n.trim();if(!n){alert('请填写文件夹名称');return;}DB.folders.push({id:uid(),name:n,emoji:document.getElementById('fnEmoji').value||'📁',articles:[]});save();closeSheet();renderHome();}
+function editFolder(id){var f=getFolder(id);if(!f)return;openSheet('<h3 style="margin-top:0;">编辑文件夹</h3><input id="feName" type="text" value="'+esc(f.name)+'"><input id="feEmoji" type="text" value="'+esc(f.emoji||'📁')+'" maxlength="2"><div style="display:flex;gap:8px;margin-top:6px;"><button class="btn" onclick="commitEditFolder(\''+id+'\')">保存</button><button class="btn ghost" onclick="closeSheet()">取消</button></div>',true);}
+function commitEditFolder(id){var f=getFolder(id);if(!f)return;var n=document.getElementById('feName').value;if(n)n=n.trim();if(!n){alert('名称不能为空');return;}f.name=n;f.emoji=document.getElementById('feEmoji').value||'📁';save();closeSheet();renderHome();}
+function delFolder(id){if(confirm('确定删除该语种及其全部文章吗？')){DB.folders=DB.folders.filter(function(x){return x.id!==id;});save();renderHome();}}
+
+function openFolder(id){state.folderId=id;state.articleId=null;renderFolder();}
+function renderFolder(){
+  var f=getFolder(state.folderId);if(!f){goHome();return;}
+  app.innerHTML='<div class="topbar"><button class="btn ghost" onclick="goHome()">← 返回</button><strong>'+f.emoji+' '+esc(f.name)+'</strong><span style="width:60px;"></span></div>'+
+    '<div class="tag-row"><input id="searchInp" type="text" placeholder="搜索文章名称" style="margin-bottom:0;flex:1;">'+
+    '<select id="sortSel" onchange="renderArticleList()"><option value="prof-desc" selected>熟练度 ↓</option><option value="prof-asc">熟练度 ↑</option><option value="name-asc">名称 ↑</option><option value="name-desc">名称 ↓</option><option value="add-desc">添加时间 ↓</option><option value="prac-desc">复习时间 ↓</option></select></div><div id="artList"></div>'+
+    '<button class="btn full-btn" onclick="newArticle()">＋ 新建文章</button>';
+  document.getElementById('searchInp').addEventListener('input',renderArticleList);renderArticleList();
+}
+function renderArticleList(){
+  var f=getFolder(state.folderId),arr=[];for(var i=0;i<f.articles.length;i++)arr.push(f.articles[i]);
+  var kw=document.getElementById('searchInp').value;if(kw){kw=kw.trim().toLowerCase();arr=arr.filter(function(a){return a.name.toLowerCase().indexOf(kw)>=0;});}
+  var sp=document.getElementById('sortSel').value.split('-'),key=sp[0],dir=sp[1];
+  arr.sort(function(a,b){var va=key==='name'?a.name:(key==='prof'?a.proficiency||0:(key==='add'?a.createdAt||0:a.lastPracticed||0)),vb=key==='name'?b.name:(key==='prof'?b.proficiency||0:(key==='add'?b.createdAt||0:b.lastPracticed||0));if(typeof va==='string')return dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);return dir==='asc'?va-vb:vb-va;});
+  var html='';
+  for(var j=0;j<arr.length;j++){
+    var a=arr[j],p=a.proficiency||0,cls=p<=2?'p-red':p<=5?'p-yellow':'p-green',t=a.lastPracticed?new Date(a.lastPracticed).toLocaleString('zh-CN'):'尚未练习';
+    html+='<div class="card" onclick="openArticle(\''+a.id+'\')">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;">'+
+      '<strong style="flex:1;">'+esc(a.name)+'</strong>'+
+      '<span class="prof-circle '+cls+'">'+p+'</span></div>'+
+      '<div style="font-size:12px;color:#999;margin-top:6px;">'+a.paragraphs.length+' 段 · 上次复习：'+t+'</div>'+
+      '<div style="display:flex;justify-content:flex-end;gap:14px;margin-top:8px;">'+
+      '<span onclick="event.stopPropagation();renameArticle(\''+a.id+'\')" style="font-size:12px;color:#6c5ce7;cursor:pointer;">重命名</span>'+
+      '<span onclick="event.stopPropagation();delArticle(\''+a.id+'\')" style="font-size:12px;color:#d63031;cursor:pointer;">删除</span>'+
+      '</div></div>';
+  }
+  if(!arr.length)html='<div style="text-align:center;color:#aaa;padding:30px 0;">暂无文章，点下方按钮新建</div>';
+  document.getElementById('artList').innerHTML=html;
+}
+function newArticle(){var n=prompt('请输入文章名称：');if(n)n=n.trim();if(!n)return;getFolder(state.folderId).articles.push({id:uid(),name:n,createdAt:Date.now(),lastPracticed:0,lastPracticeDate:'',proficiency:0,paragraphs:[]});save();renderFolder();}
+function renameArticle(aid){var a=getArticle(aid);if(!a)return;var n=prompt('重命名文章：',a.name);if(n){n=n.trim();}if(!n){return;}a.name=n;save();renderFolder();}
+function delArticle(aid){if(confirm('确定删除这篇文章吗？')){var f=getFolder(state.folderId);f.articles=f.articles.filter(function(x){return x.id!==aid;});save();renderFolder();}}
+
+function openArticle(aid){state.articleId=aid;cancelMulti();renderArticle();}
+function enterMulti(){state.multi=true;state.sel=[];renderArticle();}
+function cancelMulti(){state.multi=false;state.sel=[];renderArticle();}
+
+function renderArticle(){
+  var a=getArticle(state.articleId);if(!a){renderFolder();return;}
+  var btnLabel=state.multi?'✕ 取消':'多选';
+  var btnAction=state.multi?'cancelMulti()':'enterMulti()';
+  var html='<div class="topbar"><button class="btn ghost" onclick="renderFolder()">← 返回</button><strong>'+esc(a.name)+'</strong><button class="btn ghost" onclick="'+btnAction+'">'+btnLabel+'</button></div>'+
+    '<div class="art-actions"><button class="btn" onclick="startPractice(\'toZh\')">📖 外译汉</button><button class="btn" onclick="startPractice(\'toSrc\')">✍️ 汉译外</button><button class="btn ghost" onclick="addParagraph()">＋ 添加段落</button><button class="btn ghost" onclick="renameArticle(\''+a.id+'\')">重命名</button></div>';
+  if(state.multi){
+    html+='<div class="tag-row"><button class="btn ghost" onclick="cancelMulti()">退出多选</button><button class="btn ghost" onclick="moveSel(-1)">↑ 上移</button><button class="btn ghost" onclick="moveSel(1)">↓ 下移</button><button class="btn danger" onclick="delSel()">删除选中</button></div>'+
+      '<div class="long-hint">已选中 '+state.sel.length+' 个（再点段落可取消勾选）</div>';
+  }
+  html+='<div id="paraList"></div>';
+  app.innerHTML=html;renderParaList();
+}
+function renderParaList(){
+  var a=getArticle(state.articleId),html='';
+  for(var i=0;i<a.paragraphs.length;i++){
+    var p=a.paragraphs[i],ck=state.sel.indexOf(p.id)>=0?'selected':'';
+    html+='<div class="para-item '+ck+'" oncontextmenu="event.preventDefault();enterSel(\''+p.id+'\');return false;" onclick="'+(state.multi?'toggleSel(\''+p.id+'\')':'')+'">';
+    if(state.multi) html+='<input type="checkbox" '+(ck?'checked':'')+' style="margin-right:8px;vertical-align:middle;" onclick="event.stopPropagation();toggleSel(\''+p.id+'\')">';
+    html+='<div class="para-src">'+esc(p.source)+'</div><div class="para-tr">'+esc(p.target)+'</div>';
+    if(!state.multi) html+='<div style="font-size:11px;color:#bbb;text-align:right;margin-top:4px;cursor:pointer;" onclick="event.stopPropagation();editParagraph(\''+p.id+'\')">编辑</div>';
+    html+='</div>';
+  }
+  if(!a.paragraphs.length)html='<div style="text-align:center;color:#aaa;padding:20px 0;">还没有段落，点上方「＋ 添加段落」开始</div>';
+  document.getElementById('paraList').innerHTML=html;
+}
+function toggleSel(id){var i=state.sel.indexOf(id);if(i>=0)state.sel.splice(i,1);else state.sel.push(id);renderArticle();}
+function enterSel(id){state.multi=true;if(state.sel.indexOf(id)<0)state.sel.push(id);renderArticle();}
+function addParagraph(){editParagraph(null);}
+
+function editParagraph(pid){
+  var a=getArticle(state.articleId),p=pid?getPara(a,pid):null;
+  var src=paraDraft.pid===pid?paraDraft.source:(p?p.source:'');
+  var trg=paraDraft.pid===pid?paraDraft.target:(p?p.target:'');
+  openSheet('<h3 style="margin-top:0;">'+(p?'编辑段落':'新增段落')+'</h3><textarea id="edSrc" rows="4" placeholder="外文原文">'+esc(src)+'</textarea><textarea id="edTr" rows="4" placeholder="中文译文">'+esc(trg)+'</textarea><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;"><button class="btn ghost" onclick="openNoteSheet(\''+(pid||'')+'\')">📝 备注</button><button class="btn" onclick="savePara(\''+(pid||'')+'\')">保存</button>'+(p?'<button class="btn danger" onclick="deletePara(\''+pid+'\')">删除本段</button>':'')+'<button class="btn ghost" onclick="closeSheet()">取消</button></div>',true);
+}
+function savePara(pid){
+  var s=document.getElementById('edSrc').value;if(s)s=s.trim();var t=document.getElementById('edTr').value;if(t)t=t.trim();if(!s&&!t){closeSheet();return;}
+  var a=getArticle(state.articleId);
+  if(pid){var p=getPara(a,pid);p.source=s;p.target=t;if(paraDraft.pid===pid)p.note=paraDraft.note;}
+  else a.paragraphs.push({id:uid(),source:s,target:t,note:paraDraft.note||''});
+  paraDraft={pid:null,source:'',target:'',note:''};save();closeSheet();renderArticle();
+}
+function deletePara(pid){if(confirm('确定删除该段落？')){var a=getArticle(state.articleId);a.paragraphs=a.paragraphs.filter(function(x){return x.id!==pid;});paraDraft={pid:null,source:'',target:'',note:''};save();closeSheet();renderArticle();}}
+function openNoteSheet(pid){
+  var a=getArticle(state.articleId),p=pid?getPara(a,pid):null;
+  var cs=document.getElementById('edSrc'),ct=document.getElementById('edTr');
+  paraDraft.pid=pid;paraDraft.source=cs?cs.value:'';paraDraft.target=ct?ct.value:'';
+  if(!paraDraft.note && p) paraDraft.note=p.note||'';
+  sheet.classList.add('open');mask.classList.add('show');
+  document.getElementById('sheetBody').innerHTML='<h3 style="margin-top:0;">段落备注</h3><textarea id="noteTa" rows="6" placeholder="记录语法点、生词等...">'+esc(paraDraft.note||'')+'</textarea><div style="display:flex;gap:8px;margin-top:6px;"><button class="btn" onclick="saveNote(\''+pid+'\')">保存备注</button><button class="btn ghost" onclick="closeSheet();setTimeout(function(){editParagraph(\''+pid+'\');},100)">返回编辑</button></div>';
+}
+function saveNote(pid){paraDraft.note=document.getElementById('noteTa').value;var p=getPara(getArticle(state.articleId),pid);if(p)p.note=paraDraft.note;closeSheet();setTimeout(function(){editParagraph(pid);},100);}
+function openSheet(html,showMask){document.getElementById('sheetBody').innerHTML=html;sheet.classList.add('open');if(showMask)mask.classList.add('show');}
+function closeSheet(){sheet.classList.remove('open');mask.classList.remove('show');}
+
+/* 关键改动：备注编辑器可见时，点遮罩不关闭 */
+mask.onclick = function(){
+  var nt = document.getElementById('noteTa');
+  if(nt && nt.offsetParent !== null){ /* 备注框正在展示，吞掉点击，顺手收键盘 */
+    if(document.activeElement && typeof document.activeElement.blur === 'function') document.activeElement.blur();
+    return;
+  }
+  closeSheet();
+};
+
+var prac={mode:'',idx:0,order:[]};
+function startPractice(mode){var a=getArticle(state.articleId);if(!a.paragraphs.length){alert('还没有段落，先添加一些吧。');return;}prac={mode:mode,idx:0,order:[]};for(var i=0;i<a.paragraphs.length;i++)prac.order.push(a.paragraphs[i].id);document.getElementById('pracOverlay').classList.add('active');renderPrac();}
+function renderPrac(){var p=getPara(getArticle(state.articleId),prac.order[prac.idx]);document.getElementById('pracTitle').textContent='练习 '+(prac.idx+1)+' / '+prac.order.length;document.getElementById('pracNoteBar').style.display='none';var top=prac.mode==='toZh'?p.source:p.target,bot=prac.mode==='toZh'?p.target:p.source;document.getElementById('pracSource').textContent=top;var tg=document.getElementById('pracTarget');tg.textContent=bot;tg.classList.remove('revealed');window.__curNote=p?p.note:'';}
+function togglePracNote(){var bar=document.getElementById('pracNoteBar');bar.style.display=bar.style.display==='none'?'block':'none';if(bar.style.display==='block')bar.textContent=window.__curNote||'（本段暂无备注）';}
+function nextPractice(){if(prac.idx<prac.order.length-1){prac.idx++;renderPrac();}else{finishPractice();}}
+function exitPractice(){document.getElementById('pracOverlay').classList.remove('active');}
+function finishPractice(){var a=getArticle(state.articleId),td=todayStr();if(a.lastPracticeDate!==td){a.proficiency=(a.proficiency||0)+1;a.lastPracticeDate=td;}a.lastPracticed=Date.now();save();document.getElementById('pracOverlay').classList.remove('active');alert('🎉 全部段落练习完成！熟练度 +1');renderFolder();}
+function moveSel(dir){var arr=getArticle(state.articleId).paragraphs,idxs=[];for(var i=0;i<arr.length;i++)if(state.sel.indexOf(arr[i].id)>=0)idxs.push(i);if(!idxs.length)return;var lo=Math.min.apply(null,idxs),hi=Math.max.apply(null,idxs);if(dir<0&&lo===0)return;if(dir>0&&hi===arr.length-1)return;idxs.sort(function(u,v){return dir<0?u-v:v-u;});for(var k=0;k<idxs.length;k++){var x=idxs[k],y=dir<0?x-1:x+1,tmp=arr[x];arr[x]=arr[y];arr[y]=tmp;}save();cancelMulti();}
+function delSel(){if(!state.sel.length)return;if(!confirm('确定删除选中的段落吗？'))return;var a=getArticle(state.articleId);a.paragraphs=a.paragraphs.filter(function(p){return state.sel.indexOf(p.id)<0;});save();cancelMulti();}
+
+function exportData(){var b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}),u=URL.createObjectURL(b),el=document.createElement('a');el.href=u;el.download='译习本数据.json';document.body.appendChild(el);el.click();document.body.removeChild(el);URL.revokeObjectURL(u);}
+function importData(){var inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=function(e){var fr=new FileReader();fr.onload=function(){try{var o=JSON.parse(fr.result);if(confirm('导入将覆盖当前数据，确认？')){DB=o;save();renderHome();}}catch(err){alert('文件格式错误');}};fr.readAsText(e.target.files[0]);};inp.click();}
+
+function getFolder(id){for(var i=0;i<DB.folders.length;i++)if(DB.folders[i].id===id)return DB.folders[i];return null;}
+function getArticle(id){var f=getFolder(state.folderId);if(!f)return null;for(var i=0;i<f.articles.length;i++)if(f.articles[i].id===id)return f.articles[i];return null;}
+function getPara(a,id){for(var i=0;i<a.paragraphs.length;i++)if(a.paragraphs[i].id===id)return a.paragraphs[i];return null;}
+</script>
+</body>
+</html>
